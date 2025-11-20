@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<title>School System – Dashboard</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<style>
+		body {
+			font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+			margin: 0;
+			padding: 0;
+			background: #0f172a;
+			color: #e5e7eb;
+		}
+		header {
+			background: #111827;
+			padding: 1rem 2rem;
+			border-bottom: 1px solid #1f2937;
+		}
+		h1 {
+			margin: 0;
+			font-size: 1.5rem;
+		}
+		main {
+			max-width: 1100px;
+			margin: 1.5rem auto 3rem;
+			padding: 0 1rem;
+		}
+		.card {
+			background: #020617;
+			border-radius: 0.75rem;
+			border: 1px solid #1e293b;
+			padding: 1.5rem;
+			margin-bottom: 1.5rem;
+			box-shadow: 0 12px 30px rgba(15,23,42,0.7);
+		}
+		.card h2 {
+			margin-top: 0;
+			margin-bottom: 0.75rem;
+			font-size: 1.25rem;
+		}
+		label {
+			font-size: 0.9rem;
+			color: #9ca3af;
+		}
+		select {
+			margin-top: 0.4rem;
+			padding: 0.4rem 0.6rem;
+			border-radius: 0.5rem;
+			border: 1px solid #4b5563;
+			background: #020617;
+			color: #e5e7eb;
+			min-width: 260px;
+		}
+		select:focus {
+			outline: none;
+			border-color: #38bdf8;
+			box-shadow: 0 0 0 1px #38bdf8;
+		}
+		.meta {
+			margin-top: 0.75rem;
+			font-size: 0.9rem;
+			color: #9ca3af;
+		}
+		.list {
+			margin-top: 0.75rem;
+			max-height: 260px;
+			overflow: auto;
+			border-radius: 0.5rem;
+			border: 1px solid #1f2937;
+			background: #020617;
+		}
+		.list ul {
+			list-style: none;
+			padding: 0.4rem 0.75rem 0.75rem;
+			margin: 0;
+		}
+		.list li {
+			padding: 0.25rem 0;
+			border-bottom: 1px solid #111827;
+			font-size: 0.9rem;
+		}
+		.list li:last-child {
+			border-bottom: none;
+		}
+		.badge {
+			display: inline-block;
+			padding: 0.1rem 0.4rem;
+			border-radius: 9999px;
+			font-size: 0.75rem;
+			background: #1d4ed8;
+			color: #e5e7eb;
+			margin-left: 0.35rem;
+		}
+		.error {
+			color: #fecaca;
+			font-size: 0.85rem;
+			margin-top: 0.5rem;
+		}
+		.small {
+			font-size: 0.8rem;
+		}
+	</style>
+</head>
+<body>
+	<header>
+		<h1>School System Dashboard</h1>
+	</header>
+	<main>
+		<section class="card">
+			<h2>Teachers, Courses &amp; Sections</h2>
+			<p class="small">Pick a teacher to see the courses they teach and their sections.</p>
+
+			<div>
+				<label for="teacherSelect">Teacher</label><br />
+				<select id="teacherSelect">
+					<option value="">Loading teachers…</option>
+				</select>
+			</div>
+
+			<div class="meta" id="teacherMeta"></div>
+
+			<div style="margin-top: 1rem;">
+				<label for="sectionSelect">Sections for this teacher</label><br />
+				<select id="sectionSelect">
+					<option value="">Select a teacher first</option>
+				</select>
+			</div>
+
+			<div class="meta" id="sectionMeta"></div>
+
+			<div class="meta" id="sectionStudentsMeta"></div>
+			<div class="list" id="sectionStudentsList">
+				<ul><li>Select a section to see its students…</li></ul>
+			</div>
+
+			<div class="error" id="teacherError"></div>
+			<div class="error" id="sectionStudentsError"></div>
+		</section>
+
+		<section class="card">
+			<h2>All Students</h2>
+			<p class="small">Pulled directly from the API via <code>GET /students/</code>.</p>
+			<div class="meta" id="studentsMeta"></div>
+			<div class="list" id="studentsList">
+				<ul><li>Loading students…</li></ul>
+			</div>
+			<div class="error" id="studentsError"></div>
+		</section>
+	</main>
+
+	<script>
+		const API_BASE = "http://127.0.0.1:8001";
+
+		let teachers = [];
+		let courses = [];
+		let sections = [];
+
+		function byId(id) {
+			return document.getElementById(id);
+		}
+
+		async function fetchJson(path) {
+			const res = await fetch(API_BASE + path);
+            console.log("This is my debug statement:", path);
+			if (!res.ok) {
+				throw new Error(`Request failed: ${res.status} ${res.statusText}`);
+			}
+			return await res.json();
+		}
+
+		function buildCourseLookup() {
+			const map = new Map();
+			for (const c of courses) {
+				map.set(c.id, c);
+			}
+			return map;
+		}
+
+		function groupSectionsByTeacher() {
+			const map = new Map();
+			for (const s of sections) {
+				if (!map.has(s.teacher_id)) {
+					map.set(s.teacher_id, []);
+				}
+				map.get(s.teacher_id).push(s);
+			}
+			return map;
+		}
+
+		async function init() {
+			const teacherSelect = byId("teacherSelect");
+			const teacherMeta = byId("teacherMeta");
+			const sectionSelect = byId("sectionSelect");
+			const sectionMeta = byId("sectionMeta");
+			const sectionStudentsMeta = byId("sectionStudentsMeta");
+			const sectionStudentsList = byId("sectionStudentsList");
+			const teacherError = byId("teacherError");
+			const sectionStudentsError = byId("sectionStudentsError");
+			const studentsMeta = byId("studentsMeta");
+			const studentsList = byId("studentsList");
+			const studentsError = byId("studentsError");
+
+			try {
+				const [teachersRes, coursesRes, sectionsRes, studentsRes] = await Promise.all([
+					fetchJson("/teachers/"),
+					fetchJson("/courses/"),
+					fetchJson("/sections/"),
+					fetchJson("/students/"),
+				]);
+
+				teachers = teachersRes;
+				courses = coursesRes;
+				sections = sectionsRes;
+
+				// Populate teachers dropdown
+				teacherSelect.innerHTML = "";
+				if (teachers.length === 0) {
+					teacherSelect.innerHTML = '<option value="">No teachers found</option>';
+				} else {
+					teacherSelect.innerHTML = '<option value="">Select a teacher…</option>';
+					for (const t of teachers) {
+						const opt = document.createElement("option");
+						opt.value = String(t.id);
+						opt.textContent = `${t.first_name} ${t.last_name} (${t.subject})`;
+						teacherSelect.appendChild(opt);
+					}
+				}
+
+				// Handle teacher change
+				const courseById = buildCourseLookup();
+				const sectionsByTeacher = groupSectionsByTeacher();
+
+				teacherSelect.addEventListener("change", () => {
+					const value = teacherSelect.value;
+					sectionSelect.innerHTML = "";
+					sectionMeta.textContent = "";
+					sectionStudentsMeta.textContent = "";
+					sectionStudentsList.innerHTML = '<ul><li>Select a section to see its students…</li></ul>';
+					sectionStudentsError.textContent = "";
+
+					if (!value) {
+						sectionSelect.innerHTML = '<option value="">Select a teacher first</option>';
+						teacherMeta.textContent = "";
+						return;
+					}
+
+					const teacherId = Number(value);
+					const teacher = teachers.find(t => t.id === teacherId);
+					const teacherSections = sectionsByTeacher.get(teacherId) || [];
+
+					teacherMeta.textContent = teacherSections.length
+						? `${teacher.first_name} ${teacher.last_name} teaches ${teacherSections.length} section(s).`
+						: `${teacher.first_name} ${teacher.last_name} has no sections.`;
+
+					if (teacherSections.length === 0) {
+						sectionSelect.innerHTML = '<option value="">No sections for this teacher</option>';
+						return;
+					}
+
+					sectionSelect.innerHTML = "";
+					for (const s of teacherSections) {
+						const c = courseById.get(s.course_id);
+						const label = c
+							? `${c.title} – ${s.name}`
+							: s.name;
+						const opt = document.createElement("option");
+						opt.value = String(s.id);
+						opt.textContent = label;
+						sectionSelect.appendChild(opt);
+					}
+
+					sectionMeta.textContent = `Showing ${teacherSections.length} section(s) for this teacher.`;
+				});
+
+				// When a section is chosen, load its students via enrollments endpoint
+				sectionSelect.addEventListener("change", async () => {
+					const value = sectionSelect.value;
+					sectionStudentsMeta.textContent = "";
+					sectionStudentsError.textContent = "";
+
+					if (!value) {
+						sectionStudentsList.innerHTML = '<ul><li>Select a section to see its students…</li></ul>';
+						return;
+					}
+
+					const sectionId = Number(value);
+					sectionStudentsList.innerHTML = '<ul><li>Loading students for this section…</li></ul>';
+					try {
+						const studentsInSection = await fetchJson(`/enrollments/section/${sectionId}`);
+						sectionStudentsMeta.textContent = `Students in this section: ${studentsInSection.length}`;
+
+						if (studentsInSection.length === 0) {
+							sectionStudentsList.innerHTML = '<ul><li>No students enrolled in this section yet.</li></ul>';
+							return;
+						}
+
+						const ulSec = document.createElement("ul");
+						for (const s of studentsInSection) {
+							const li = document.createElement("li");
+							li.textContent = `${s.id}. ${s.first_name} ${s.last_name} – ${s.email}`;
+							ulSec.appendChild(li);
+						}
+						sectionStudentsList.innerHTML = "";
+						sectionStudentsList.appendChild(ulSec);
+					} catch (err) {
+						console.error(err);
+						sectionStudentsError.textContent = "Error loading students for this section.";
+						sectionStudentsList.innerHTML = '<ul><li>Unable to load students.</li></ul>';
+					}
+				});
+
+				// Students list
+				const students = studentsRes;
+				studentsMeta.textContent = `Total students: ${students.length}`;
+
+				const ul = document.createElement("ul");
+				for (const s of students) {
+					const li = document.createElement("li");
+					li.textContent = `${s.id}. ${s.first_name} ${s.last_name} – ${s.email}`;
+					ul.appendChild(li);
+				}
+				studentsList.innerHTML = "";
+				studentsList.appendChild(ul);
+			} catch (err) {
+				console.error(err);
+				teacherError.textContent = "Error loading teachers/courses/sections. Is the API running on http://127.0.0.1:8001?";
+				studentsError.textContent = "Error loading students.";
+			}
+		}
+
+		window.addEventListener("DOMContentLoaded", init);
+	</script>
+</body>
+</html>
+

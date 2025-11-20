@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import select, Session
 
 from ..database import get_session
-from ..models import Course, CourseCreate, CourseRead
+from ..models import Course, CourseCreate, CourseRead, CourseUpdate
 
 router = APIRouter()
 
@@ -32,3 +32,26 @@ def get_course(course_id: int, session: Session = Depends(get_session)) -> Cours
 		raise HTTPException(status_code=404, detail="Course not found")
 	return course
 
+
+@router.patch("/{course_id}", response_model=CourseRead)
+def update_course(course_id: int, payload: CourseUpdate, session: Session = Depends(get_session)) -> Course:
+	course = session.get(Course, course_id)
+	if not course:
+		raise HTTPException(status_code=404, detail="Course not found")
+	update_data = payload.model_dump(exclude_unset=True)
+	for key, value in update_data.items():
+		setattr(course, key, value)
+	session.add(course)
+	session.commit()
+	session.refresh(course)
+	return course
+
+
+@router.delete("/{course_id}", status_code=status.HTTP_200_OK)
+def delete_course(course_id: int, session: Session = Depends(get_session)) -> dict:
+	course = session.get(Course, course_id)
+	if not course:
+		raise HTTPException(status_code=404, detail="Course not found")
+	session.delete(course)
+	session.commit()
+	return {"detail": "Course deleted"}

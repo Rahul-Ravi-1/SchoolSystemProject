@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Optional, List
 from enum import Enum
 from sqlmodel import SQLModel, Field, Relationship
-from sqlalchemy.orm import Mapped
 
 
 class Subject(str, Enum):
@@ -21,7 +20,6 @@ class StudentBase(SQLModel):
 
 class Student(StudentBase, table=True):
 	id: Optional[int] = Field(default=None, primary_key=True)
-	enrollments: Mapped[List["Enrollment"]] = Relationship(back_populates="student")
 
 
 class StudentRead(StudentBase):
@@ -30,6 +28,12 @@ class StudentRead(StudentBase):
 
 class StudentCreate(StudentBase):
 	pass
+
+
+class StudentUpdate(SQLModel):
+	first_name: Optional[str] = None
+	last_name: Optional[str] = None
+	email: Optional[str] = None
 
 
 class TeacherBase(SQLModel):
@@ -41,7 +45,6 @@ class TeacherBase(SQLModel):
 
 class Teacher(TeacherBase, table=True):
 	id: Optional[int] = Field(default=None, primary_key=True)
-	sections: Mapped[List["Section"]] = Relationship(back_populates="teacher")
 
 
 class TeacherRead(TeacherBase):
@@ -52,6 +55,13 @@ class TeacherCreate(TeacherBase):
 	pass
 
 
+class TeacherUpdate(SQLModel):
+	first_name: Optional[str] = None
+	last_name: Optional[str] = None
+	email: Optional[str] = None
+	subject: Optional[Subject] = None
+
+
 class CourseBase(SQLModel):
 	title: str
 	description: Optional[str] = None
@@ -59,7 +69,6 @@ class CourseBase(SQLModel):
 
 class Course(CourseBase, table=True):
 	id: Optional[int] = Field(default=None, primary_key=True)
-	sections: Mapped[List["Section"]] = Relationship(back_populates="course")
 
 
 class CourseRead(CourseBase):
@@ -68,6 +77,11 @@ class CourseRead(CourseBase):
 
 class CourseCreate(CourseBase):
 	pass
+
+
+class CourseUpdate(SQLModel):
+	title: Optional[str] = None
+	description: Optional[str] = None
 
 
 class SectionBase(SQLModel):
@@ -79,10 +93,6 @@ class Section(SectionBase, table=True):
 	id: Optional[int] = Field(default=None, primary_key=True)
 	course_id: int = Field(foreign_key="course.id")
 	teacher_id: int = Field(foreign_key="teacher.id")
-
-	course: Mapped[Optional["Course"]] = Relationship(back_populates="sections")
-	teacher: Mapped[Optional["Teacher"]] = Relationship(back_populates="sections")
-	enrollments: Mapped[List["Enrollment"]] = Relationship(back_populates="section")
 
 
 class SectionRead(SectionBase):
@@ -101,6 +111,3 @@ class Enrollment(SQLModel, table=True):
 	student_id: int = Field(foreign_key="student.id")
 	section_id: int = Field(foreign_key="section.id")
 	grade: Optional[str] = None
-
-	student: Mapped[Optional["Student"]] = Relationship(back_populates="enrollments")
-	section: Mapped[Optional["Section"]] = Relationship(back_populates="enrollments")

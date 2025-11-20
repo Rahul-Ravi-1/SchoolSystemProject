@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from typing import List
+import random
 
 from sqlmodel import Session, select
 
 from .database import engine
-from .models import Course, Teacher, Section, Subject
+from .models import Course, Teacher, Section, Subject, Student, Enrollment
 
 FIRST_NAMES = [
 	"Ava", "Liam", "Emma", "Noah", "Olivia", "Elijah", "Sophia", "Lucas", "Isabella", "Mason",
@@ -62,10 +63,57 @@ def seed() -> None:
 			for n in range(1, 4):
 				name = f"{teacher.subject.value} Sec {n} (T{teacher.id})"
 				# Avoid duplicates if re-seeding
-				if session.exec(select(Section).where(Section.name == name, Section.teacher_id == teacher.id)).first():
+				if session.exec(
+					select(Section).where(
+						Section.name == name, Section.teacher_id == teacher.id
+					)
+				).first():
 					continue
 				section = Section(name=name, capacity=30, course_id=course.id, teacher_id=teacher.id)
 				session.add(section)
+				session.commit()
+
+		# Students: create ~100 demo students
+		existing_students = session.exec(select(Student)).all()
+		if not existing_students:
+			idx = 0
+			for i in range(100):
+				first = FIRST_NAMES[idx % len(FIRST_NAMES)]
+				last = LAST_NAMES[idx % len(LAST_NAMES)]
+				idx += 1
+				email = f"{first.lower()}.{last.lower()}{i}@example.com"
+				# Just in case, skip duplicates
+				if session.exec(select(Student).where(Student.email == email)).first():
+					continue
+				student = Student(first_name=first, last_name=last, email=email)
+				session.add(student)
+				session.commit()
+
+		# Enrollments: enroll each student in a few random sections
+		all_students = session.exec(select(Student)).all()
+		all_sections = session.exec(select(Section)).all()
+
+		if all_students and all_sections:
+			for student in all_students:
+				# 2–4 random sections per student (no duplicates)
+				k = min(len(all_sections), random.randint(2, 4))
+				for section in random.sample(all_sections, k=k):
+					# Skip if this enrollment already exists
+					exists = session.exec(
+						select(Enrollment).where(
+							Enrollment.student_id == student.id,
+							Enrollment.section_id == section.id,
+						)
+					).first()
+					if exists:
+						continue
+					grade = random.choice(["A", "B", "C", "D", None])
+					enrollment = Enrollment(
+						student_id=student.id,
+						section_id=section.id,
+						grade=grade,
+					)
+					session.add(enrollment)
 				session.commit()
 
 

@@ -56,12 +56,12 @@ def update_section(section_id: int, payload: SectionCreate, session: Session = D
 	return section
 
 
-@router.delete("/{section_id}", response_model=None, status_code=status.HTTP_204_NO_CONTENT)
-def delete_section(section_id: int, session: Session = Depends(get_session)) -> None:
+@router.delete("/{section_id}", response_model=None, status_code=status.HTTP_200_OK)
+def delete_section(section_id: int, session: Session = Depends(get_session)) -> dict:
 	section = session.get(Section, section_id)
 	if not section:
 		raise HTTPException(status_code=404, detail="Section not found")
 	session.delete(section)
 	session.commit()
-	return None
+	return {"detail": "Section deleted"}
 

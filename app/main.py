@@ -1,11 +1,21 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 from .database import init_db
-from .routers import students, teachers, courses
-from .routers import sections, enrollments
+from .routers import students, teachers, courses, sections, enrollments
 
 app = FastAPI(title="School System API", version="0.2.0")
+
+# Allow the frontend (opened from file:// or another origin) to call this API
+app.add_middleware(
+	CORSMiddleware,
+	allow_origins=["*"],
+	allow_credentials=True,
+	allow_methods=["*"],
+	allow_headers=["*"],
+)
 
 
 @app.on_event("startup")

@@ -29,14 +29,14 @@ def enroll_student(student_id: int, section_id: int, session: Session = Depends(
 	return enrollment
 
 
-@router.delete("/{enrollment_id}", response_model=None, status_code=status.HTTP_204_NO_CONTENT)
-def unenroll(enrollment_id: int, session: Session = Depends(get_session)) -> None:
+@router.delete("/{enrollment_id}", response_model=None, status_code=status.HTTP_200_OK)
+def unenroll(enrollment_id: int, session: Session = Depends(get_session)) -> dict:
 	enrollment = session.get(Enrollment, enrollment_id)
 	if not enrollment:
 		raise HTTPException(status_code=404, detail="Enrollment not found")
 	session.delete(enrollment)
 	session.commit()
-	return None
+	return {"detail": "Enrollment deleted"}
 
 
 @router.get("/student/{student_id}", response_model=List[Section])

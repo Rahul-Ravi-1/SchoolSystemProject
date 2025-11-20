@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import select, Session
 
 from ..database import get_session
-from ..models import Teacher, TeacherCreate, TeacherRead
+from ..models import Teacher, TeacherCreate, TeacherRead, TeacherUpdate
 
 router = APIRouter()
 
@@ -32,3 +32,26 @@ def get_teacher(teacher_id: int, session: Session = Depends(get_session)) -> Tea
 		raise HTTPException(status_code=404, detail="Teacher not found")
 	return teacher
 
+
+@router.patch("/{teacher_id}", response_model=TeacherRead)
+def update_teacher(teacher_id: int, payload: TeacherUpdate, session: Session = Depends(get_session)) -> Teacher:
+	teacher = session.get(Teacher, teacher_id)
+	if not teacher:
+		raise HTTPException(status_code=404, detail="Teacher not found")
+	update_data = payload.model_dump(exclude_unset=True)
+	for key, value in update_data.items():
+		setattr(teacher, key, value)
+	session.add(teacher)
+	session.commit()
+	session.refresh(teacher)
+	return teacher
+
+
+@router.delete("/{teacher_id}", status_code=status.HTTP_200_OK)
+def delete_teacher(teacher_id: int, session: Session = Depends(get_session)) -> dict:
+	teacher = session.get(Teacher, teacher_id)
+	if not teacher:
+		raise HTTPException(status_code=404, detail="Teacher not found")
+	session.delete(teacher)
+	session.commit()
+	return {"detail": "Teacher deleted"}
