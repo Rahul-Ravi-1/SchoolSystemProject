@@ -20,6 +20,7 @@ class StudentBase(SQLModel):
 
 class Student(StudentBase, table=True):
 	id: Optional[int] = Field(default=None, primary_key=True)
+	password_hash: Optional[str] = Field(default=None, nullable=True)
 
 
 class StudentRead(StudentBase):
@@ -34,6 +35,11 @@ class StudentUpdate(SQLModel):
 	first_name: Optional[str] = None
 	last_name: Optional[str] = None
 	email: Optional[str] = None
+
+
+class StudentLogin(SQLModel):
+	student_id: int
+	password: str
 
 
 class TeacherBase(SQLModel):
@@ -111,3 +117,17 @@ class Enrollment(SQLModel, table=True):
 	student_id: int = Field(foreign_key="student.id")
 	section_id: int = Field(foreign_key="section.id")
 	grade: Optional[str] = None
+
+
+class StudentClassWithGrade(SQLModel):
+	course_title: str
+	section_name: str
+	section_id: int
+	teacher_name: str
+	teacher_email: str
+	grade: Optional[str] = None
+
+
+class Token(SQLModel):
+	access_token: str
+	token_type: str = "bearer"

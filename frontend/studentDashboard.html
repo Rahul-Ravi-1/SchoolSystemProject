@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<title>Student Dashboard</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<style>
+		body {
+			font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+			margin: 0;
+			padding: 0;
+			background: #0f172a;
+			color: #e5e7eb;
+		}
+		header {
+			background: #111827;
+			padding: 1rem 2rem;
+			border-bottom: 1px solid #1f2937;
+		}
+		h1 {
+			margin: 0;
+			font-size: 1.5rem;
+		}
+		main {
+			max-width: 1000px;
+			margin: 1.5rem auto 3rem;
+			padding: 0 1rem;
+		}
+		.card {
+			background: #020617;
+			border-radius: 0.75rem;
+			border: 1px solid #1e293b;
+			padding: 1.5rem;
+			margin-bottom: 1.5rem;
+			box-shadow: 0 12px 30px rgba(15,23,42,0.7);
+		}
+		.card h2 {
+			margin-top: 0;
+			margin-bottom: 0.75rem;
+			font-size: 1.25rem;
+		}
+		label {
+			font-size: 0.9rem;
+			color: #9ca3af;
+		}
+		input {
+			width: 100%;
+			margin-top: 0.4rem;
+			padding: 0.4rem 0.6rem;
+			border-radius: 0.5rem;
+			border: 1px solid #4b5563;
+			background: #020617;
+			color: #e5e7eb;
+			box-sizing: border-box;
+		}
+		input:focus {
+			outline: none;
+			border-color: #38bdf8;
+			box-shadow: 0 0 0 1px #38bdf8;
+		}
+		button {
+			margin-top: 0.9rem;
+			padding: 0.5rem 1rem;
+			border-radius: 0.5rem;
+			border: none;
+			background: #2563eb;
+			color: white;
+			font-weight: 500;
+			cursor: pointer;
+		}
+		button:disabled {
+			opacity: 0.6;
+			cursor: default;
+		}
+		helper {
+			font-size: 0.85rem;
+			color: #9ca3af;
+		}
+		.error {
+			color: #fecaca;
+			font-size: 0.85rem;
+			margin-top: 0.5rem;
+		}
+		.small {
+			font-size: 0.8rem;
+		}
+		table {
+			width: 100%;
+			border-collapse: collapse;
+			font-size: 0.9rem;
+			margin-top: 0.75rem;
+		}
+		th, td {
+			padding: 0.5rem 0.75rem;
+			border-bottom: 1px solid #1f2937;
+			text-align: left;
+		}
+		th {
+			background: #020617;
+			font-weight: 600;
+		}
+		tr:last-child td {
+			border-bottom: none;
+		}
+		grade-pill {
+			display: inline-block;
+			padding: 0.1rem 0.45rem;
+			border-radius: 999px;
+			font-size: 0.75rem;
+			background: #1d4ed8;
+		}
+		.meta {
+			font-size: 0.85rem;
+			color: #9ca3af;
+			margin-top: 0.5rem;
+		}
+	</style>
+</head>
+<body>
+	<header>
+		<h1>Student Dashboard</h1>
+	</header>
+	<main>
+		<section class="card">
+			<h2>Sign in</h2>
+			<p class="small">
+				Use a demo student created by the seed script.
+				All demo students share the password <code>student123</code>.
+			</p>
+
+			<div>
+				<label for="studentIdInput">Student ID</label><br />
+				<input id="studentIdInput" type="number" placeholder="e.g. 1" />
+			</div>
+			<div style="margin-top: 0.6rem;">
+				<label for="passwordInput">Password</label><br />
+				<input id="passwordInput" type="password" placeholder="student123" />
+			</div>
+			<button id="loginButton">Log in</button>
+			<div class="error" id="loginError"></div>
+			<div class="meta" id="loginMeta"></div>
+		</section>
+
+		<section class="card" id="classesCard" style="display:none;">
+			<h2>My Classes &amp; Grades</h2>
+			<p class="small" id="welcomeText"></p>
+			<div class="meta" id="classesMeta"></div>
+			<div class="error" id="classesError"></div>
+			<div id="classesTableContainer"></div>
+		</section>
+	</main>
+
+	<script>
+		const API_BASE = "http://127.0.0.1:8001";
+
+		let accessToken = null;
+
+		function byId(id) {
+			return document.getElementById(id);
+		}
+
+		async function loginStudent() {
+			const studentIdInput = byId("studentIdInput");
+			const passwordInput = byId("passwordInput");
+			const loginButton = byId("loginButton");
+			const loginError = byId("loginError");
+			const loginMeta = byId("loginMeta");
+
+			loginError.textContent = "";
+			loginMeta.textContent = "";
+
+			const studentIdValue = studentIdInput.value.trim();
+			const passwordValue = passwordInput.value;
+
+			if (!studentIdValue || !passwordValue) {
+				loginError.textContent = "Please enter both student ID and password.";
+				return;
+			}
+
+			const studentId = Number(studentIdValue);
+			if (!Number.isInteger(studentId) || studentId <= 0) {
+				loginError.textContent = "Student ID must be a positive integer.";
+				return;
+			}
+
+			loginButton.disabled = true;
+			loginButton.textContent = "Logging in…";
+
+			try {
+				const res = await fetch(API_BASE + "/auth/login", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({
+						student_id: studentId,
+						password: passwordValue,
+					}),
+				});
+
+				if (!res.ok) {
+					const data = await res.json().catch(() => ({}));
+					loginError.textContent =
+						data && data.detail
+							? "Login failed: " + data.detail
+							: "Login failed. Please check your ID and password.";
+					return;
+				}
+
+				const data = await res.json();
+				accessToken = data.access_token;
+				loginMeta.textContent = "Logged in successfully. Loading your classes…";
+
+				// Show classes card and load data
+				byId("classesCard").style.display = "block";
+				await loadMyClasses();
+			} catch (err) {
+				console.error(err);
+				loginError.textContent = "Network error while logging in.";
+			} finally {
+				loginButton.disabled = false;
+				loginButton.textContent = "Log in";
+			}
+		}
+
+		async function loadMyClasses() {
+			const classesMeta = byId("classesMeta");
+			const classesError = byId("classesError");
+			const classesTableContainer = byId("classesTableContainer");
+			const welcomeText = byId("welcomeText");
+
+			classesMeta.textContent = "";
+			classesError.textContent = "";
+			classesTableContainer.innerHTML = "Loading classes…";
+
+			if (!accessToken) {
+				classesError.textContent = "You must log in first.";
+				return;
+			}
+
+			try {
+				// Optionally fetch basic student info to show a welcome message
+				// We don't have a /me/profile route yet, so we'll just show the ID.
+				const welcomeStudentId = byId("studentIdInput").value.trim();
+				welcomeText.textContent = welcomeStudentId
+					? "Signed in as student #" + welcomeStudentId + "."
+					: "";
+
+				const res = await fetch(API_BASE + "/students/me/classes-with-grades", {
+					headers: {
+						Authorization: "Bearer " + accessToken,
+					},
+				});
+
+				if (!res.ok) {
+					const data = await res.json().catch(() => ({}));
+					classesError.textContent =
+						data && data.detail
+							? "Error loading classes: " + data.detail
+							: "Error loading classes.";
+					classesTableContainer.innerHTML = "";
+					return;
+				}
+
+				const items = await res.json();
+				if (!Array.isArray(items) || items.length === 0) {
+					classesMeta.textContent = "No classes found for this student.";
+					classesTableContainer.innerHTML = "";
+					return;
+				}
+
+				classesMeta.textContent = "You are enrolled in " + items.length + " class(es).";
+
+				const table = document.createElement("table");
+				const thead = document.createElement("thead");
+				const headerRow = document.createElement("tr");
+				for (const label of ["Course", "Section", "Teacher", "Grade"]) {
+					const th = document.createElement("th");
+					th.textContent = label;
+					headerRow.appendChild(th);
+				}
+				thead.appendChild(headerRow);
+				table.appendChild(thead);
+
+				const tbody = document.createElement("tbody");
+				for (const item of items) {
+					const tr = document.createElement("tr");
+
+					const tdCourse = document.createElement("td");
+					tdCourse.textContent = item.course_title || "";
+					tr.appendChild(tdCourse);
+
+					const tdSection = document.createElement("td");
+					tdSection.textContent = item.section_name || "";
+					tr.appendChild(tdSection);
+
+					const tdTeacher = document.createElement("td");
+					tdTeacher.textContent = item.teacher_name || "";
+					tr.appendChild(tdTeacher);
+
+					const tdGrade = document.createElement("td");
+					const gradeValue = item.grade;
+					if (gradeValue === null || gradeValue === undefined) {
+						tdGrade.textContent = "Not graded yet";
+					} else {
+						const span = document.createElement("span");
+						span.textContent = gradeValue;
+						span.style.display = "inline-block";
+						span.style.padding = "0.1rem 0.45rem";
+						span.style.borderRadius = "999px";
+						span.style.fontSize = "0.75rem";
+						span.style.background = "#1d4ed8";
+						span.style.color = "#e5e7eb";
+						tdGrade.appendChild(span);
+					}
+					tr.appendChild(tdGrade);
+
+					tbody.appendChild(tr);
+				}
+
+				table.appendChild(tbody);
+				classesTableContainer.innerHTML = "";
+				classesTableContainer.appendChild(table);
+			} catch (err) {
+				console.error(err);
+				classesError.textContent = "Network error while loading classes.";
+				classesTableContainer.innerHTML = "";
+			}
+		}
+
+		window.addEventListener("DOMContentLoaded", () => {
+			byId("loginButton").addEventListener("click", loginStudent);
+
+			byId("passwordInput").addEventListener("keydown", (event) => {
+				if (event.key === "Enter") {
+					event.preventDefault();
+					loginStudent();
+				}
+			});
+		});
+	</script>
+</body>
+</html>
+
+
+
