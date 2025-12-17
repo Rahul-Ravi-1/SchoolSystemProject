@@ -7,7 +7,6 @@ from sqlmodel import Session, select
 
 from .database import engine
 from .models import Course, Teacher, Section, Subject, Student, Enrollment
-from .security import get_password_hash
 
 FIRST_NAMES = [
 	"Ava", "Liam", "Emma", "Noah", "Olivia", "Elijah", "Sophia", "Lucas", "Isabella", "Mason",
@@ -86,14 +85,7 @@ def seed() -> None:
 				# Just in case, skip duplicates
 				if session.exec(select(Student).where(Student.email == email)).first():
 					continue
-				# For demo purposes, all seeded students share the same password.
-				# Plain-text password: "student123"
-				student = Student(
-					first_name=first,
-					last_name=last,
-					email=email,
-					password_hash=get_password_hash("student123"),
-				)
+				student = Student(first_name=first, last_name=last, email=email)
 				session.add(student)
 				session.commit()
 
