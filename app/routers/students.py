@@ -17,6 +17,9 @@ from ..models import (
 	StudentClassWithGrade,
 )
 from .auth import get_current_student
+from ..security import get_password_hash
+import secrets
+import string
 
 router = APIRouter()
 
@@ -132,3 +135,20 @@ def get_my_classes_with_grades(
 		student_id=current_student.id,  # type: ignore[arg-type]
 		session=session,
 	)
+def generate_temp_password(length: int = 10) -> str:
+    chars = string.ascii_letters + string.digits
+    return "".join(secrets.choice(chars) for _ in range(length))
+@router.post("/{student_id}/reset-password")
+def reset_student_password(student_id:int, session: Session = Depends(get_session), ) -> dict:
+	student = session.get(Student, student_id)
+	if not student:
+		raise HTTPException(status_code=404, detail="Student not found")
+	new_password = generate_temp_password()
+	student.password_hash = get_password_hash(new_password)
+	session.add(student)
+	session.commit()
+	session.refresh(student)
+	return {
+		"student_id": student.id,
+		"new_password": new_password,
+	}

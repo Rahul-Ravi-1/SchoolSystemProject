@@ -31,6 +31,7 @@ def get_course(course_id: int, session: Session = Depends(get_session)) -> Cours
 	if not course:
 		raise HTTPException(status_code=404, detail="Course not found")
 	return course
+	
 
 
 @router.patch("/{course_id}", response_model=CourseRead)

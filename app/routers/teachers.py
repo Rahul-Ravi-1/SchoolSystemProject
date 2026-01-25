@@ -5,7 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import select, Session
 
 from ..database import get_session
-from ..models import Teacher, TeacherCreate, TeacherRead, TeacherUpdate
+from ..models import Teacher, TeacherCreate, TeacherRead, TeacherUpdate, Section, SectionRead
+from .auth import get_current_teacher
 
 router = APIRouter()
 
@@ -55,3 +56,15 @@ def delete_teacher(teacher_id: int, session: Session = Depends(get_session)) -> 
 	session.delete(teacher)
 	session.commit()
 	return {"detail": "Teacher deleted"}
+
+
+@router.get("/me/sections", response_model=List[SectionRead])
+def get_my_sections(
+	current_teacher: Teacher = Depends(get_current_teacher),
+	session: Session = Depends(get_session)
+) -> List[Section]:
+	"""Get all sections for the currently logged-in teacher"""
+	sections = session.exec(
+		select(Section).where(Section.teacher_id == current_teacher.id)
+	).all()
+	return list(sections)

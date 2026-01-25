@@ -140,11 +140,15 @@
 
 		<section class="card">
 			<h2>All Students</h2>
-			<p class="small">Pulled directly from the API via <code>GET /students/</code>.</p>
+			<p class="small">
+				Pulled directly from the API via <code>GET /students/</code>.
+				Teachers can also reset a student's password for learning purposes.
+			</p>
 			<div class="meta" id="studentsMeta"></div>
 			<div class="list" id="studentsList">
 				<ul><li>Loading students…</li></ul>
 			</div>
+			<div class="meta" id="studentsPasswordMeta"></div>
 			<div class="error" id="studentsError"></div>
 		</section>
 	</main>
@@ -199,6 +203,7 @@
 			const sectionStudentsError = byId("sectionStudentsError");
 			const studentsMeta = byId("studentsMeta");
 			const studentsList = byId("studentsList");
+			const studentsPasswordMeta = byId("studentsPasswordMeta");
 			const studentsError = byId("studentsError");
 
 			try {
@@ -298,7 +303,7 @@
 						const ulSec = document.createElement("ul");
 						for (const s of studentsInSection) {
 							const li = document.createElement("li");
-							li.textContent = `${s.id}. ${s.first_name} ${s.last_name} – ${s.email}`;
+							li.textContent = `${s.student_id}. ${s.first_name} ${s.last_name} – ${s.email}`;
 							ulSec.appendChild(li);
 						}
 						sectionStudentsList.innerHTML = "";
@@ -317,7 +322,45 @@
 				const ul = document.createElement("ul");
 				for (const s of students) {
 					const li = document.createElement("li");
-					li.textContent = `${s.id}. ${s.first_name} ${s.last_name} – ${s.email}`;
+
+					const span = document.createElement("span");
+					span.textContent = `${s.id}. ${s.first_name} ${s.last_name} – ${s.email} `;
+
+					const btn = document.createElement("button");
+					btn.textContent = "Reset password";
+					btn.style.marginLeft = "0.5rem";
+					btn.style.fontSize = "0.75rem";
+					btn.style.padding = "0.2rem 0.5rem";
+
+					btn.addEventListener("click", async () => {
+						studentsPasswordMeta.textContent = `Resetting password for student ${s.id}…`;
+						studentsError.textContent = "";
+
+						try {
+							const res = await fetch(`${API_BASE}/students/${s.id}/reset-password`, {
+								method: "POST",
+							});
+
+							if (!res.ok) {
+								const data = await res.json().catch(() => ({}));
+								const detail = data && data.detail ? data.detail : "Unknown error";
+								studentsError.textContent = `Failed to reset password: ${detail}`;
+								studentsPasswordMeta.textContent = "";
+								return;
+							}
+
+							const data = await res.json();
+							studentsPasswordMeta.textContent =
+								`New temporary password for student ${data.student_id} is: ${data.new_password}`;
+						} catch (err) {
+							console.error(err);
+							studentsError.textContent = "Network error while resetting password.";
+							studentsPasswordMeta.textContent = "";
+						}
+					});
+
+					li.appendChild(span);
+					li.appendChild(btn);
 					ul.appendChild(li);
 				}
 				studentsList.innerHTML = "";

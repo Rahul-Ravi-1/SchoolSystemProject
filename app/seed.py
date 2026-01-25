@@ -7,6 +7,7 @@ from sqlmodel import Session, select
 
 from .database import engine
 from .models import Course, Teacher, Section, Subject, Student, Enrollment
+from .security import get_password_hash
 
 FIRST_NAMES = [
 	"Ava", "Liam", "Emma", "Noah", "Olivia", "Elijah", "Sophia", "Lucas", "Isabella", "Mason",
@@ -57,6 +58,15 @@ def seed() -> None:
 				teachers.append(teacher)
 				idx += 1
 
+		# Ensure all teachers have an ID-based password like "teacher001"
+		all_teachers = session.exec(select(Teacher)).all()
+		for teacher in all_teachers:
+			if not teacher.password_hash:  # Only set if not already set
+				raw_password = f"teacher{teacher.id:03d}"
+				teacher.password_hash = get_password_hash(raw_password)
+				session.add(teacher)
+		session.commit()
+
 		# Sections: 3 per teacher for their course
 		for teacher in teachers:
 			course = course_by_subject[teacher.subject]
@@ -73,9 +83,10 @@ def seed() -> None:
 				session.add(section)
 				session.commit()
 
-		# Students: create ~100 demo students
+		# Students: create ~100 demo students (only if there are none yet).
 		existing_students = session.exec(select(Student)).all()
 		if not existing_students:
+			# Batch-insert demo students in a single transaction.
 			idx = 0
 			for i in range(100):
 				first = FIRST_NAMES[idx % len(FIRST_NAMES)]
@@ -85,12 +96,25 @@ def seed() -> None:
 				# Just in case, skip duplicates
 				if session.exec(select(Student).where(Student.email == email)).first():
 					continue
-				student = Student(first_name=first, last_name=last, email=email)
+
+				student = Student(
+					first_name=first,
+					last_name=last,
+					email=email,
+				)
 				session.add(student)
-				session.commit()
+
+			session.commit()
+
+		# Ensure all students have an ID-based password like "student001".
+		all_students = session.exec(select(Student)).all()
+		for student in all_students:
+			raw_password = f"student{student.id:03d}"
+			student.password_hash = get_password_hash(raw_password)
+			session.add(student)
+		session.commit()
 
 		# Enrollments: enroll each student in a few random sections
-		all_students = session.exec(select(Student)).all()
 		all_sections = session.exec(select(Section)).all()
 
 		if all_students and all_sections:
@@ -114,7 +138,7 @@ def seed() -> None:
 						grade=grade,
 					)
 					session.add(enrollment)
-				session.commit()
+			session.commit()
 
 
 if __name__ == "__main__":

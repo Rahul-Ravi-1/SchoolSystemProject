@@ -125,7 +125,9 @@
 			<h2>Sign in</h2>
 			<p class="small">
 				Use a demo student created by the seed script.
-				All demo students share the password <code>student123</code>.
+				Each demo student's password is based on their ID:
+				for example, ID <code>1</code> uses password <code>student001</code>,
+				ID <code>12</code> uses <code>student012</code>, etc.
 			</p>
 
 			<div>
@@ -134,7 +136,7 @@
 			</div>
 			<div style="margin-top: 0.6rem;">
 				<label for="passwordInput">Password</label><br />
-				<input id="passwordInput" type="password" placeholder="student123" />
+				<input id="passwordInput" type="password" placeholder="e.g. student001" />
 			</div>
 			<button id="loginButton">Log in</button>
 			<div class="error" id="loginError"></div>

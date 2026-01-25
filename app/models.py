@@ -42,6 +42,11 @@ class StudentLogin(SQLModel):
 	password: str
 
 
+class TeacherLogin(SQLModel):
+	teacher_id: int
+	password: str
+
+
 class TeacherBase(SQLModel):
 	first_name: str
 	last_name: str
@@ -51,6 +56,7 @@ class TeacherBase(SQLModel):
 
 class Teacher(TeacherBase, table=True):
 	id: Optional[int] = Field(default=None, primary_key=True)
+	password_hash: Optional[str] = Field(default=None, nullable=True)
 
 
 class TeacherRead(TeacherBase):
@@ -125,6 +131,16 @@ class StudentClassWithGrade(SQLModel):
 	section_id: int
 	teacher_name: str
 	teacher_email: str
+	grade: Optional[str] = None
+
+
+class StudentInSection(SQLModel):
+	"""Student with their enrollment and grade info for a specific section"""
+	student_id: int
+	enrollment_id: int
+	first_name: str
+	last_name: str
+	email: str
 	grade: Optional[str] = None
 
 

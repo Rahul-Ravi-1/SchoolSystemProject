@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import select, Session
+from pydantic import BaseModel
 
 from ..database import get_session
-from ..models import Enrollment, Student, Section
+from ..models import Enrollment, Student, Section, StudentInSection, Teacher
+from .auth import get_current_teacher
 
 router = APIRouter()
 
@@ -52,15 +54,69 @@ def list_student_sections(student_id: int, session: Session = Depends(get_sessio
 	return sections
 
 
-@router.get("/section/{section_id}", response_model=List[Student])
-def list_section_students(section_id: int, session: Session = Depends(get_session)) -> List[Student]:
+@router.get("/section/{section_id}", response_model=List[StudentInSection])
+def list_section_students(section_id: int, session: Session = Depends(get_session)) -> List[StudentInSection]:
+	"""Get all students in a section along with their enrollment IDs and grades"""
 	section = session.get(Section, section_id)
 	if not section:
 		raise HTTPException(status_code=404, detail="Section not found")
+	
 	enrollments = session.exec(select(Enrollment).where(Enrollment.section_id == section_id)).all()
-	student_ids = [e.student_id for e in enrollments]
-	if not student_ids:
+	if not enrollments:
 		return []
+	
+	student_ids = [e.student_id for e in enrollments]
 	students = session.exec(select(Student).where(Student.id.in_(student_ids))).all()
-	return students
+	
+	# Create lookup map
+	student_map = {s.id: s for s in students}
+	
+	results: List[StudentInSection] = []
+	for enrollment in enrollments:
+		student = student_map.get(enrollment.student_id)
+		if student:
+			results.append(StudentInSection(
+				student_id=student.id,  # type: ignore[arg-type]
+				enrollment_id=enrollment.id,  # type: ignore[arg-type]
+				first_name=student.first_name,
+				last_name=student.last_name,
+				email=student.email,
+				grade=enrollment.grade
+			))
+	
+	return results
+
+
+class GradeUpdate(BaseModel):
+	grade: Optional[str] = None
+
+
+@router.patch("/{enrollment_id}/grade", response_model=Enrollment)
+def update_enrollment_grade(
+	enrollment_id: int,
+	payload: GradeUpdate,
+	current_teacher: Teacher = Depends(get_current_teacher),
+	session: Session = Depends(get_session)
+) -> Enrollment:
+	"""Update the grade for a specific enrollment - TEACHERS ONLY"""
+	enrollment = session.get(Enrollment, enrollment_id)
+	if not enrollment:
+		raise HTTPException(status_code=404, detail="Enrollment not found")
+	
+	# Security check: Verify teacher teaches this section
+	section = session.get(Section, enrollment.section_id)
+	if not section:
+		raise HTTPException(status_code=404, detail="Section not found")
+	
+	if section.teacher_id != current_teacher.id:
+		raise HTTPException(
+			status_code=status.HTTP_403_FORBIDDEN,
+			detail="You can only update grades for sections you teach"
+		)
+	
+	enrollment.grade = payload.grade
+	session.add(enrollment)
+	session.commit()
+	session.refresh(enrollment)
+	return enrollment
 

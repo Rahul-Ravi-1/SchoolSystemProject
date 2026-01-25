@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<title>Teacher Dashboard</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<style>
+		body {
+			font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+			margin: 0;
+			padding: 0;
+			background: #0f172a;
+			color: #e5e7eb;
+		}
+		header {
+			background: #111827;
+			padding: 1rem 2rem;
+			border-bottom: 1px solid #1f2937;
+		}
+		h1 {
+			margin: 0;
+			font-size: 1.5rem;
+		}
+		main {
+			max-width: 1200px;
+			margin: 1.5rem auto 3rem;
+			padding: 0 1rem;
+		}
+		.card {
+			background: #020617;
+			border-radius: 0.75rem;
+			border: 1px solid #1e293b;
+			padding: 1.5rem;
+			margin-bottom: 1.5rem;
+			box-shadow: 0 12px 30px rgba(15,23,42,0.7);
+		}
+		.card h2 {
+			margin-top: 0;
+			margin-bottom: 0.75rem;
+			font-size: 1.25rem;
+		}
+		label {
+			font-size: 0.9rem;
+			color: #9ca3af;
+		}
+		input, select {
+			width: 100%;
+			margin-top: 0.4rem;
+			padding: 0.4rem 0.6rem;
+			border-radius: 0.5rem;
+			border: 1px solid #4b5563;
+			background: #020617;
+			color: #e5e7eb;
+			box-sizing: border-box;
+		}
+		input:focus, select:focus {
+			outline: none;
+			border-color: #38bdf8;
+			box-shadow: 0 0 0 1px #38bdf8;
+		}
+		button {
+			margin-top: 0.9rem;
+			padding: 0.5rem 1rem;
+			border-radius: 0.5rem;
+			border: none;
+			background: #2563eb;
+			color: white;
+			font-weight: 500;
+			cursor: pointer;
+		}
+		button:hover {
+			background: #1d4ed8;
+		}
+		button:disabled {
+			opacity: 0.6;
+			cursor: default;
+		}
+		button.small {
+			padding: 0.25rem 0.6rem;
+			font-size: 0.8rem;
+			margin-top: 0;
+		}
+		.error {
+			color: #fecaca;
+			font-size: 0.85rem;
+			margin-top: 0.5rem;
+		}
+		.success {
+			color: #86efac;
+			font-size: 0.85rem;
+			margin-top: 0.5rem;
+		}
+		.small {
+			font-size: 0.8rem;
+		}
+		.meta {
+			font-size: 0.85rem;
+			color: #9ca3af;
+			margin-top: 0.5rem;
+		}
+		table {
+			width: 100%;
+			border-collapse: collapse;
+			font-size: 0.9rem;
+			margin-top: 0.75rem;
+		}
+		th, td {
+			padding: 0.6rem 0.75rem;
+			border-bottom: 1px solid #1f2937;
+			text-align: left;
+		}
+		th {
+			background: #020617;
+			font-weight: 600;
+		}
+		tr:last-child td {
+			border-bottom: none;
+		}
+		.grade-input {
+			width: 80px;
+			padding: 0.25rem 0.4rem;
+			font-size: 0.85rem;
+		}
+	</style>
+</head>
+<body>
+	<header>
+		<h1>Teacher Dashboard</h1>
+	</header>
+	<main>
+		<section class="card">
+			<h2>Sign in</h2>
+			<p class="small">
+				Use a demo teacher created by the seed script.
+				Each demo teacher's password is based on their ID:
+				for example, ID <code>1</code> uses password <code>teacher001</code>,
+				ID <code>12</code> uses <code>teacher012</code>, etc.
+			</p>
+
+			<div>
+				<label for="teacherIdInput">Teacher ID</label><br />
+				<input id="teacherIdInput" type="number" placeholder="e.g. 1" />
+			</div>
+			<div style="margin-top: 0.6rem;">
+				<label for="passwordInput">Password</label><br />
+				<input id="passwordInput" type="password" placeholder="e.g. teacher001" />
+			</div>
+			<button id="loginButton">Log in</button>
+			<div class="error" id="loginError"></div>
+			<div class="meta" id="loginMeta"></div>
+		</section>
+
+		<section class="card" id="sectionsCard" style="display:none;">
+			<h2>My Sections</h2>
+			<p class="small" id="welcomeText"></p>
+			<div class="meta" id="sectionsMeta"></div>
+			<div class="error" id="sectionsError"></div>
+			
+			<div style="margin-top: 1rem;">
+				<label for="sectionSelect">Select a section to view students</label><br />
+				<select id="sectionSelect">
+					<option value="">Loading sections…</option>
+				</select>
+			</div>
+		</section>
+
+		<section class="card" id="studentsCard" style="display:none;">
+			<h2>Students in Section</h2>
+			<p class="small" id="sectionInfo"></p>
+			<div class="meta" id="studentsMeta"></div>
+			<div class="error" id="studentsError"></div>
+			<div class="success" id="studentsSuccess"></div>
+			<div id="studentsTableContainer"></div>
+		</section>
+	</main>
+
+	<script>
+		const API_BASE = "http://127.0.0.1:8001";
+
+		let accessToken = null;
+		let sections = [];
+		let courses = [];
+
+		function byId(id) {
+			return document.getElementById(id);
+		}
+
+		async function loginTeacher() {
+			const teacherIdInput = byId("teacherIdInput");
+			const passwordInput = byId("passwordInput");
+			const loginButton = byId("loginButton");
+			const loginError = byId("loginError");
+			const loginMeta = byId("loginMeta");
+
+			loginError.textContent = "";
+			loginMeta.textContent = "";
+
+			const teacherIdValue = teacherIdInput.value.trim();
+			const passwordValue = passwordInput.value;
+
+			if (!teacherIdValue || !passwordValue) {
+				loginError.textContent = "Please enter both teacher ID and password.";
+				return;
+			}
+
+			const teacherId = Number(teacherIdValue);
+			if (!Number.isInteger(teacherId) || teacherId <= 0) {
+				loginError.textContent = "Teacher ID must be a positive integer.";
+				return;
+			}
+
+			loginButton.disabled = true;
+			loginButton.textContent = "Logging in…";
+
+			try {
+				const res = await fetch(API_BASE + "/auth/teacher-login", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({
+						teacher_id: teacherId,
+						password: passwordValue,
+					}),
+				});
+
+				if (!res.ok) {
+					const data = await res.json().catch(() => ({}));
+					loginError.textContent =
+						data && data.detail
+							? "Login failed: " + data.detail
+							: "Login failed. Please check your ID and password.";
+					return;
+				}
+
+				const data = await res.json();
+				accessToken = data.access_token;
+				loginMeta.textContent = "Logged in successfully. Loading your sections…";
+
+				// Show sections card and load data
+				byId("sectionsCard").style.display = "block";
+				await loadMySections();
+			} catch (err) {
+				console.error(err);
+				loginError.textContent = "Network error while logging in.";
+			} finally {
+				loginButton.disabled = false;
+				loginButton.textContent = "Log in";
+			}
+		}
+
+		async function loadMySections() {
+			const sectionsMeta = byId("sectionsMeta");
+			const sectionsError = byId("sectionsError");
+			const sectionSelect = byId("sectionSelect");
+			const welcomeText = byId("welcomeText");
+
+			sectionsMeta.textContent = "";
+			sectionsError.textContent = "";
+			sectionSelect.innerHTML = '<option value="">Loading sections…</option>';
+
+			if (!accessToken) {
+				sectionsError.textContent = "You must log in first.";
+				return;
+			}
+
+			try {
+				// Fetch teacher's sections
+				const sectionsRes = await fetch(API_BASE + "/teachers/me/sections", {
+					headers: {
+						Authorization: "Bearer " + accessToken,
+					},
+				});
+
+				if (!sectionsRes.ok) {
+					const data = await sectionsRes.json().catch(() => ({}));
+					sectionsError.textContent =
+						data && data.detail
+							? "Error loading sections: " + data.detail
+							: "Error loading sections.";
+					return;
+				}
+
+				sections = await sectionsRes.json();
+
+				// Fetch all courses to map course_id to title
+				const coursesRes = await fetch(API_BASE + "/courses/");
+				if (coursesRes.ok) {
+					courses = await coursesRes.json();
+				}
+
+				const teacherId = byId("teacherIdInput").value.trim();
+				welcomeText.textContent = teacherId
+					? "Signed in as teacher #" + teacherId + "."
+					: "";
+
+				if (!sections || sections.length === 0) {
+					sectionsMeta.textContent = "You have no sections assigned.";
+					sectionSelect.innerHTML = '<option value="">No sections</option>';
+					return;
+				}
+
+				sectionsMeta.textContent = "You teach " + sections.length + " section(s).";
+
+				// Populate sections dropdown
+				sectionSelect.innerHTML = '<option value="">Select a section…</option>';
+				const courseMap = new Map(courses.map(c => [c.id, c.title]));
+
+				for (const section of sections) {
+					const opt = document.createElement("option");
+					opt.value = String(section.id);
+					const courseTitle = courseMap.get(section.course_id) || "Unknown Course";
+					opt.textContent = `${courseTitle} – ${section.name}`;
+					sectionSelect.appendChild(opt);
+				}
+
+			} catch (err) {
+				console.error(err);
+				sectionsError.textContent = "Network error while loading sections.";
+			}
+		}
+
+		async function loadSectionStudents(sectionId) {
+			const studentsCard = byId("studentsCard");
+			const sectionInfo = byId("sectionInfo");
+			const studentsMeta = byId("studentsMeta");
+			const studentsError = byId("studentsError");
+			const studentsSuccess = byId("studentsSuccess");
+			const studentsTableContainer = byId("studentsTableContainer");
+
+			studentsCard.style.display = "block";
+			studentsMeta.textContent = "";
+			studentsError.textContent = "";
+			studentsSuccess.textContent = "";
+			studentsTableContainer.innerHTML = "Loading students…";
+
+			// Find section info
+			const section = sections.find(s => s.id === sectionId);
+			const courseMap = new Map(courses.map(c => [c.id, c.title]));
+			const courseTitle = section ? courseMap.get(section.course_id) || "Unknown" : "Unknown";
+			sectionInfo.textContent = section
+				? `Viewing students in: ${courseTitle} – ${section.name}`
+				: `Section ID: ${sectionId}`;
+
+			try {
+				const res = await fetch(API_BASE + `/enrollments/section/${sectionId}`, {
+					headers: {
+						Authorization: "Bearer " + accessToken,
+					},
+				});
+
+				if (!res.ok) {
+					const data = await res.json().catch(() => ({}));
+					studentsError.textContent =
+						data && data.detail
+							? "Error loading students: " + data.detail
+							: "Error loading students.";
+					studentsTableContainer.innerHTML = "";
+					return;
+				}
+
+				const students = await res.json();
+
+				if (!Array.isArray(students) || students.length === 0) {
+					studentsMeta.textContent = "No students enrolled in this section.";
+					studentsTableContainer.innerHTML = "";
+					return;
+				}
+
+				studentsMeta.textContent = students.length + " student(s) enrolled.";
+
+				const table = document.createElement("table");
+				const thead = document.createElement("thead");
+				const headerRow = document.createElement("tr");
+				for (const label of ["Name", "Email", "Grade", "Actions"]) {
+					const th = document.createElement("th");
+					th.textContent = label;
+					headerRow.appendChild(th);
+				}
+				thead.appendChild(headerRow);
+				table.appendChild(thead);
+
+				const tbody = document.createElement("tbody");
+				for (const student of students) {
+					const tr = document.createElement("tr");
+
+					const tdName = document.createElement("td");
+					tdName.textContent = `${student.first_name} ${student.last_name}`;
+					tr.appendChild(tdName);
+
+					const tdEmail = document.createElement("td");
+					tdEmail.textContent = student.email || "";
+					tr.appendChild(tdEmail);
+
+					const tdGrade = document.createElement("td");
+					const gradeInput = document.createElement("input");
+					gradeInput.type = "text";
+					gradeInput.className = "grade-input";
+					gradeInput.value = student.grade || "";
+					gradeInput.placeholder = "A, B, C...";
+					gradeInput.dataset.enrollmentId = student.enrollment_id;
+					tdGrade.appendChild(gradeInput);
+					tr.appendChild(tdGrade);
+
+					const tdActions = document.createElement("td");
+					const updateBtn = document.createElement("button");
+					updateBtn.textContent = "Update";
+					updateBtn.className = "small";
+					updateBtn.addEventListener("click", async () => {
+						await updateGrade(student.enrollment_id, gradeInput.value, sectionId);
+					});
+					tdActions.appendChild(updateBtn);
+					tr.appendChild(tdActions);
+
+					tbody.appendChild(tr);
+				}
+
+				table.appendChild(tbody);
+				studentsTableContainer.innerHTML = "";
+				studentsTableContainer.appendChild(table);
+			} catch (err) {
+				console.error(err);
+				studentsError.textContent = "Network error while loading students.";
+				studentsTableContainer.innerHTML = "";
+			}
+		}
+
+		async function updateGrade(enrollmentId, grade, sectionId) {
+			const studentsError = byId("studentsError");
+			const studentsSuccess = byId("studentsSuccess");
+
+			studentsError.textContent = "";
+			studentsSuccess.textContent = "";
+
+			try {
+				const res = await fetch(API_BASE + `/enrollments/${enrollmentId}/grade`, {
+					method: "PATCH",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: "Bearer " + accessToken,
+					},
+					body: JSON.stringify({
+						grade: grade || null,
+					}),
+				});
+
+				if (!res.ok) {
+					const data = await res.json().catch(() => ({}));
+					studentsError.textContent =
+						data && data.detail
+							? "Failed to update grade: " + data.detail
+							: "Failed to update grade.";
+					return;
+				}
+
+				studentsSuccess.textContent = "Grade updated successfully!";
+				
+				// Refresh the student list to show updated data
+				setTimeout(() => {
+					studentsSuccess.textContent = "";
+				}, 3000);
+
+			} catch (err) {
+				console.error(err);
+				studentsError.textContent = "Network error while updating grade.";
+			}
+		}
+
+		window.addEventListener("DOMContentLoaded", () => {
+			byId("loginButton").addEventListener("click", loginTeacher);
+
+			byId("passwordInput").addEventListener("keydown", (event) => {
+				if (event.key === "Enter") {
+					event.preventDefault();
+					loginTeacher();
+				}
+			});
+
+			byId("sectionSelect").addEventListener("change", (event) => {
+				const value = event.target.value;
+				if (value) {
+					loadSectionStudents(Number(value));
+				} else {
+					byId("studentsCard").style.display = "none";
+				}
+			});
+		});
+	</script>
+</body>
+</html>
